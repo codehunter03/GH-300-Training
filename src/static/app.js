@@ -10,8 +10,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/activities");
       const activities = await response.json();
 
-      // Clear loading message
+      // Clear loading message and activity list
       activitiesList.innerHTML = "";
+      // Clear dropdown options (keep the default option)
+      activitySelect.innerHTML = '<option value="">Select an activity</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -23,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Create participants list HTML
         const participantsList = details.participants.length > 0
           ? details.participants
-              .map(participant => `<li>${participant}</li>`)
+              .map(participant => `<li>${participant} <button class="delete-btn" data-activity="${name}" data-email="${participant}" title="Unregister">×</button></li>`)
               .join("")
           : "<li><em>No participants yet</em></li>";
 
@@ -42,6 +44,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
         activitiesList.appendChild(activityCard);
 
+        // Add event listeners for delete buttons
+        const deleteButtons = activityCard.querySelectorAll(".delete-btn");
+        deleteButtons.forEach(button => {
+          button.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const activity = event.target.dataset.activity;
+            const email = event.target.dataset.email;
+            await unregisterParticipant(activity, email);
+          });
+        });
+
         // Add option to select dropdown
         const option = document.createElement("option");
         option.value = name;
@@ -54,6 +67,40 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Function to unregister a participant
+  async function unregisterParticipant(activity, email) {
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activity)}/unregister?email=${encodeURIComponent(email)}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        messageDiv.textContent = result.message;
+        messageDiv.className = "success";
+        fetchActivities();
+      } else {
+        messageDiv.textContent = result.detail || "An error occurred";
+        messageDiv.className = "error";
+      }
+
+      messageDiv.classList.remove("hidden");
+
+      // Hide message after 5 seconds
+      setTimeout(() => {
+        messageDiv.classList.add("hidden");
+      }, 5000);
+    } catch (error) {
+      messageDiv.textContent = "Failed to unregister. Please try again.";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      console.error("Error unregistering:", error);
+    }
+  }
 
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
